@@ -465,7 +465,9 @@ function loadCleared() {
 function saveCleared(set) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
-  } catch {}
+  } catch {
+    // localStorageが使えない環境では保存をスキップ
+  }
 }
 
 export default function App() {
@@ -473,18 +475,27 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all"); // all | cleared | uncleared
 
+  useEffect(() => {
+    saveCleared(cleared);
+  }, [cleared]);
+
   const toggleCleared = (id) => {
     setCleared(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
-      saveCleared(next);
       return next;
     });
   };
 
   const filtered = useMemo(() => {
+    // ひらがな→カタカナ変換（検索時にひらがな入力でカタカナもマッチさせるため）
+    const toKatakana = (str) => str.replace(/[\u3041-\u3096]/g, ch =>
+      String.fromCharCode(ch.charCodeAt(0) + 0x60)
+    );
+    const queryKana = toKatakana(query);
     return P_SWITCHES.filter(sw => {
-      const matchQ = query === "" || sw.title.includes(query) || sw.area.includes(query);
+      const matchQ = query === "" || sw.title.includes(query) || sw.area.includes(query)
+        || sw.title.includes(queryKana) || sw.area.includes(queryKana);
       if (!matchQ) return false;
       if (filter === "cleared") return cleared.has(sw.id);
       if (filter === "uncleared") return !cleared.has(sw.id);
